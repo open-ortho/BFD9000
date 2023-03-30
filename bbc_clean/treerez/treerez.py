@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 TreeRez
 convert and resize
