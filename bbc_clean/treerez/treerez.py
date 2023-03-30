@@ -64,10 +64,13 @@ def convert(scans):
 			d = os.path.dirname(p)
 			f = os.path.splitext(os.path.basename(p))[0]
 			try:
-				if args.dry_run:
+				if not args.dryrun:
+					print("Real Run")
 					if(not os.path.exists(d)):
 						os.makedirs(d)
 					im.save(os.path.join(d, f"{f}.png"), 'PNG')
+				else:
+					print("Dry Run Not Doing anything")
 				count += 1
 				print(f"[{count}/{len(scans)}] SAVED: {d}|{f}.png")
 			except OSError as e:
@@ -87,7 +90,7 @@ if(__name__ == "__main__"):
 	parser = argparse.ArgumentParser()
 	parser.add_argument("source", help="source folder - contains patients folders with xray-scans")
 	parser.add_argument("destination", help="destination folder - sampled xray-scans will be copied and resized here")
-	parser.add_argument("-n", "--dry-run", help="Do nothing, dry run", action='store_true', default=False)
+	parser.add_argument("-n", "--dryrun", help="Do nothing, dry run", action='store_true', default=False)
 	parser.add_argument("-r", "--resolution", help="target resolution for copied xray-scans (default: 1024)", type=int, default=1024, metavar="")
 	parser.add_argument("-q", "--quantity", help="number of sampled patients (default: 1)", type=int, default=1, metavar="")
 	parser.add_argument("-t", "--trim", help="auto-trimming threshold - from 0 (black) to 255 (white) (default: 240)", type=int, default=240, metavar="")
