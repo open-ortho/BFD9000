@@ -9,6 +9,8 @@ __version__ = "0.1.0"
 __license__ = "MIT"
 
 
+import logging
+logging.basicConfig(level=logging.INFO)
 from PIL import Image
 import numpy as np
 import os
@@ -21,7 +23,7 @@ def get_patients_sample():
 	
 	patients = list([obj.name for obj in os.scandir(source_folder) if obj.is_dir()])
 	patients_sample = sample(patients, quantity)
-	print(f"Sampled {len(patients_sample)} patients out of {len(patients)} total.")
+	logging.info(f"Sampled {len(patients_sample)} patients out of {len(patients)} total.")
 	return patients_sample
 
 
@@ -54,31 +56,37 @@ def convert(scans):
 	count = 0
 	for xray in scans:
 		with Image.open(xray) as im:
-			np_im = np.array(im)
-			np_im = np_im / np.amax(np_im) * 255
 			try:
-				cropped_np_im = autotrim(np_im)
-				im = Image.fromarray(cropped_np_im)
-			except:
-				im = Image.fromarray(np_im)
-				
-			im = im.convert(mode='RGB') 
-			im.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
-			p = os.path.join(destination_folder, os.path.relpath(xray, source_folder))
-			d = os.path.dirname(p)
-			f = os.path.splitext(os.path.basename(p))[0]
-			try:
-				if not args.dryrun:
-					print("Real Run")
-					if(not os.path.exists(d)):
-						os.makedirs(d)
-					im.save(os.path.join(d, f"{f}.png"), 'PNG')
-				else:
-					print("Dry Run Not Doing anything")
-				count += 1
-				print(f"[{count}/{len(scans)}] SAVED: {d}|{f}.png")
-			except OSError as e:
-				print(e)
+				np_im = np.array(im)
+				np_im = np_im / np.amax(np_im) * 255 # Convert to 8 bit.
+				try:
+					cropped_np_im = autotrim(np_im)
+					im = Image.fromarray(cropped_np_im)
+				except:
+					logging.warning(f"Error while autotrimming {xray}. Skipping.")
+					im = Image.fromarray(np_im)
+
+				im = im.convert(mode='RGB') 
+				im.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
+				p = os.path.join(destination_folder, os.path.relpath(xray, source_folder))
+				d = os.path.dirname(p)
+				f = os.path.splitext(os.path.basename(p))[0]
+				try:
+					if not args.dryrun:
+						filename = os.path.join(d, f"{f}.png")
+						logging.info(f"Writing {filename}")
+						if(not os.path.exists(d)):
+							os.makedirs(d)
+						im.save(filename, 'PNG')
+					else:
+						logging.info("Dry Run Not Doing anything")
+					count += 1
+					logging.info(f"[{count}/{len(scans)}] SAVED: {d}|{f}.png")
+				except OSError as e:
+					logging.error(e)
+			except Exception as e:
+				logging.error(f"ERROR opening: {xray}")
+				logging.error(e)
 
 
 def main(args):
