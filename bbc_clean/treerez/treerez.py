@@ -56,8 +56,12 @@ def convert(scans):
 		with Image.open(xray) as im:
 			np_im = np.array(im)
 			np_im = np_im / np.amax(np_im) * 255
-			cropped_np_im = autotrim(np_im)
-			im = Image.fromarray(cropped_np_im)
+			try:
+				cropped_np_im = autotrim(np_im)
+				im = Image.fromarray(cropped_np_im)
+			except:
+				im = Image.fromarray(np_im)
+				
 			im = im.convert(mode='RGB') 
 			im.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
 			p = os.path.join(destination_folder, os.path.relpath(xray, source_folder))
