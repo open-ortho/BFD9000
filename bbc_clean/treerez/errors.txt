@@ -1,0 +1,4 @@
+ERROR:root:ERROR opening: F:/Bolton Backup/Bolton-Brush Study Files/Backup Broadbent Bolton Collection of Patient X-rays\B3582\Frontal\B3582F10.tif
+ERROR:root:buffer is not large enough
+ERROR:root:ERROR opening: F:/Bolton Backup/Bolton-Brush Study Files/Backup Broadbent Bolton Collection of Patient X-rays\B3582\Lateral\B3582L5.tif
+ERROR:root:buffer is not large enough
