@@ -18,8 +18,8 @@ from random import sample
 import argparse
 
 
-def get_patients_sample():
-	""" Get patients folders from the source folder and create a list of random samples."""
+def get_patients_sample() -> list:
+	""" Get patients folders from the source folder and return a list of random samples."""
 	
 	patients = list([obj.name for obj in os.scandir(source_folder) if obj.is_dir()])
 	patients_sample = sample(patients, quantity)
@@ -27,8 +27,8 @@ def get_patients_sample():
 	return patients_sample
 
 
-def get_scans(patients_sample):
-	""" Prepare a list with all the scans of the sampled patients """
+def get_scans(patients_sample) -> list:
+	""" Return a list with all the scans of the sampled patients """
 	
 	scans = []
 	for patient in patients_sample:
