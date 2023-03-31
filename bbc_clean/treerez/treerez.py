@@ -55,8 +55,8 @@ def convert(scans):
 	""" Open each scan, convert it to 8bit RGB format, resize to THUMBNAIL_SIZE and save it as PNG in DESTINATION_FOLDER """
 	count = 0
 	for xray in scans:
-		with Image.open(xray) as im:
-			try:
+		try:
+			with Image.open(xray) as im:
 				np_im = np.array(im)
 				np_im = np_im / np.amax(np_im) * 255 # Convert to 8 bit.
 				try:
@@ -84,9 +84,9 @@ def convert(scans):
 					logging.info(f"[{count}/{len(scans)}] SAVED: {d}|{f}.png")
 				except OSError as e:
 					logging.error(e)
-			except Exception as e:
-				logging.error(f"ERROR opening: {xray}")
-				logging.error(e)
+		except Exception as e:
+			logging.error(f"ERROR opening: {xray}")
+			logging.error(e)
 
 
 def main(args):
