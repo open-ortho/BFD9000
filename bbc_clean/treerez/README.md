@@ -4,7 +4,7 @@ TreeRez lets you randomly sample a subset of patient folders, copying and resizi
 ### Install
 create a python env as usual (venv, pipenv, conda, etc..)
 
-```pip install -r treerez_requirements.txt```
+```pip install -r requirements.txt```
 ### HowTo
 ```
 python treerez.py -h
