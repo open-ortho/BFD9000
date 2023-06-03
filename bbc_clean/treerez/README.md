@@ -22,3 +22,5 @@ options:
   -q , --quantity     number of sampled patients (default: 1)
   -t , --trim         auto-trimming threshold - from 0 (black) to 255 (white) (default: 240)
 ```
+
+You can find more details in the [treerez logbook](/documentation/treerez_logbook.ipynb).
