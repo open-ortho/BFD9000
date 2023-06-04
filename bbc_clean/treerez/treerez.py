@@ -36,7 +36,7 @@ def get_scans(patients_sample) -> list:
 		for xray in xray_types:
 			if(xray.is_dir()):
 				for img in os.scandir(xray.path):
-					if(img.name.endswith(('tif','tiff'))):
+					if(img.name.lower.endswith(('tif','tiff'))):
 						scans.append(img.path)
 	return scans
 	
