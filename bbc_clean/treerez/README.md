@@ -2,6 +2,7 @@
 ## Simple commandline utility to copy & resize TIFF scans
 To apply machine learning or deep learning to the BB-Collection for automatic correction of rotation, flipping, segmentation, etc., a subset of the scans must be prepared as a training set. For performance reasons, the resolution of the training set should be lower than that of the original.  
 Furthermore, the scans should be examined and any large borders removed to enhance the effectiveness and improve the scoring potential of the trained models.  
+
 TreeRez lets you randomly sample a subset of patient folders, copying and resizing TIFF scans, automatically trimming white borders and converting them to RGB PNGs.
 ### Install
 create a python env as usual (venv, pipenv, conda, etc..)
