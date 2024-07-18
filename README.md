@@ -1,6 +1,6 @@
 # BFD9000
 
-The BFD9000 stands for Bolton Files Dicomizer 9000. 9000 is just a huge version number, which is supposed to be intimidating.
+Contrary to popular belief, the BFD9000 stands for Bolton Files Dicomizer 9000. 9000 is just a huge version number, which is supposed to be intimidating.
 
 Tools and processes to convert the Bolton-Brush Collection to digital format.
 
