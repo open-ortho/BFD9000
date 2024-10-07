@@ -31,7 +31,7 @@ Combines classic image processing with a deep learning classification model.
 
 The complete experiment and code can be found in the Jupyter notebook:
 
-📄 [AutoSplit Logbook](documentation/autosplit_logbook.ipynb)
+📄 [AutoSplit Logbook](autosplit_logbook.ipynb)
 
 ### Running Locally
 
