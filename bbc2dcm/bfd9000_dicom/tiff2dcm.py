@@ -1,3 +1,4 @@
+import os
 import pydicom
 import argparse
 import datetime
@@ -9,6 +10,30 @@ import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+def extract_and_convert_data(file_path):
+    file_name = os.path.basename(file_path)
+    # Extract data from file name
+    patient_id = file_name[0:5]
+    print(f"[{patient_id}]")
+    image_type = file_name[5]
+    print(f"[{image_type}]")
+    patient_sex = file_name[6]
+    print(f"[{patient_sex}]")
+    patient_age = file_name[7:13]  # Assume format is 'AAyBBm'
+    print(f"[{patient_age}]")
+    
+    # Parse age from format 'AAyBBm' (e.g., '23y02m') to total months 'nnnM'
+    years = int(patient_age[:2])
+    months = int(patient_age[3:5])
+    total_months = years * 12 + months
+    
+    # Format total months as zero-padded string 'nnnM'
+    formatted_age = f"{total_months:03}M"  # Zero-padded to 3 digits
+    print(f"[{formatted_age}]")
+
+    
+    return patient_id, image_type, patient_sex, formatted_age
 
 def convert_tiff_to_dicom(tiff_path, dicom_path):
     # Open the TIFF file using Pillow
@@ -37,7 +62,7 @@ def convert_tiff_to_dicom(tiff_path, dicom_path):
         high_bit = bits_stored - 1
 
     # Create and populate DICOM dataset with image data and metadata
-    ds = build_dicom_without_image()
+    ds = build_dicom_without_image(tiff_path)
     ds.Rows, ds.Columns = img_array.shape[0], img_array.shape[1]
     ds.SamplesPerPixel = 1
     ds.PhotometricInterpretation = "MONOCHROME2"
@@ -53,7 +78,7 @@ def convert_tiff_to_dicom(tiff_path, dicom_path):
     print(f"Saved DICOM file at {dicom_path}")
 
 
-def build_dicom_without_image() -> Dataset:
+def build_dicom_without_image(file_path) -> Dataset:
     # Create the DICOM Dataset
     # Create File Meta Information
     file_meta = FileMetaDataset()
@@ -63,8 +88,8 @@ def build_dicom_without_image() -> Dataset:
     file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
     ds=Dataset()
     ds.file_meta = file_meta
+    ds.PatientID, image_type, ds.PatientSex, ds.PatientAge = extract_and_convert_data(file_path)
     ds.PatientName = "Test^Firstname"
-    ds.PatientID = "123456"
     ds.StudyInstanceUID = pydicom.uid.generate_uid()
     ds.SeriesInstanceUID = pydicom.uid.generate_uid()
     ds.SOPInstanceUID = pydicom.uid.generate_uid()
@@ -83,8 +108,7 @@ def build_dicom_without_image() -> Dataset:
     ds.ImageComments = 'Converted from TIFF'
 
     # Additional DICOM attributes to address missing elements
-    ds.PatientBirthDate = '19000101'  # Placeholder, use actual birth date
-    ds.PatientSex = 'O'  # 'M' for Male, 'F' for Female, 'O' for Other/Unknown
+    # ds.PatientBirthDate = '19000101'  # Placeholder, use actual birth date
     ds.ReferringPhysicianName = 'Referring^Physician'
     ds.AccessionNumber = '123456789'  # Use the actual accession number
     
@@ -93,8 +117,8 @@ def build_dicom_without_image() -> Dataset:
     
     # Conditional elements (only necessary under certain conditions)
     # These should be set based on the actual image and its metadata, and may be omitted if not applicable.
-    ds.Laterality = 'R'  # 'R' for Right, 'L' for Left, if applicable to the image
-    ds.PatientOrientation = 'AF'  # AnteroPosterior, again if applicable
+    ds.ImageLaterality = 'U'  
+    ds.PatientOrientation = 'AF'  
     return ds
 
 def main():
