@@ -9,8 +9,11 @@ from PIL import Image
 import numpy as np
 import logging
 
+from bfd9000_dicom.dicom_tags import dpi_to_dicom_spacing
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 
 def extract_and_convert_data(file_path):
     file_name = os.path.basename(file_path)
@@ -23,18 +26,18 @@ def extract_and_convert_data(file_path):
     print(f"[{patient_sex}]")
     patient_age = file_name[7:13]  # Assume format is 'AAyBBm'
     print(f"[{patient_age}]")
-    
+
     # Parse age from format 'AAyBBm' (e.g., '23y02m') to total months 'nnnM'
     years = int(patient_age[:2])
     months = int(patient_age[3:5])
     total_months = years * 12 + months
-    
+
     # Format total months as zero-padded string 'nnnM'
     formatted_age = f"{total_months:03}M"  # Zero-padded to 3 digits
     print(f"[{formatted_age}]")
 
-    
     return patient_id, image_type, patient_sex, formatted_age
+
 
 def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
     # Open the TIFF file using Pillow
@@ -42,13 +45,17 @@ def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
         # Convert image to grayscale if it isn't already
         img = img.convert('I')
 
+        # Extract DPI information
+        dpi_horizontal, dpi_vertical = img.info['dpi']
+
         # Load the image into a numpy array and ensure it's in 16-bit
-        img_array = np.array(img, dtype=np.uint16)  # Explicitly setting dtype to uint16
+        # Explicitly setting dtype to uint16
+        img_array = np.array(img, dtype=np.uint16)
 
         # Check the array dimensions and flatten if necessary
         if len(img_array.shape) > 2:
-            img_array = img_array[:, :, 0]  # Take the first channel if multi-dimensional
-
+            # Take the first channel if multi-dimensional
+            img_array = img_array[:, :, 0]
 
         # Check maximum pixel value to infer bit depth
         max_pixel_value = img_array.max()
@@ -57,8 +64,9 @@ def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
         else:
             bits_allocated = 12  # Assumes 12-bit data if max value is 4095 or less
 
-        logger.warning(f"max_pixel_value: {max_pixel_value}, allocating {bits_allocated} bits.")
-        
+        logger.warning(f"max_pixel_value: {max_pixel_value}, allocating {
+                       bits_allocated} bits.")
+
         bits_stored = bits_allocated
         high_bit = bits_stored - 1
 
@@ -76,10 +84,12 @@ def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
     ds.HighBit = high_bit
     ds.PixelData = img_array.tobytes()
 
-
+    ds.NominalScannedPixelSpacing, ds.PixelAspectRatio = dpi_to_dicom_spacing(
+        dpi_horizontal, dpi_vertical)
     # Save the DICOM file
     ds.save_as(dicom_path, write_like_original=False)
     print(f"Saved DICOM file at {dicom_path}")
+
 
 def load_dataset_from_file(json_file_path) -> Dataset:
     with open(json_file_path, 'r') as file:
@@ -97,7 +107,8 @@ def build_file_meta() -> FileMetaDataset:
     file_meta.ImplementationClassUID = pydicom.uid.generate_uid()
     file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
     return file_meta
-    
+
+
 def add_common_tags(ds) -> Dataset:
     ds.PatientName = f'{ds.PatientID}^Bolton Study Subject'
     ds.ReferringPhysicianName = 'Referring^Physician'
@@ -106,16 +117,30 @@ def add_common_tags(ds) -> Dataset:
     ds.SecondaryCaptureDeviceManufacturer = 'Vidar'
     ds.SecondaryCaptureDeviceManufacturerModelName = 'DosimetryPRO Advantage'
     ds.SecondaryCaptureDeviceSoftwareVersions = '49.7'
+
     ds.Modality = 'RG'  # Radiographic imaging (conventional film/screen)
-    ds.ConversionType = 'DF' # Digitized Film
+    ds.ConversionType = 'DF'  # Digitized Film
+
+    # Patient Module
+    ds.PatientBirthDate = ''
+    ds.PatientIdentityRemoved = 'YES'
+    ds.DeidentificationMethod = 'Removed: Patient name, birthdate, study date/time.'
+
+    # General Study Module
+    ds.StudyDate = ""  # These are required or empty if unknown.
+    ds.StudyTime = ""  # These are required or empty if unknown.
+
+    # General Image Module
+    ds.BurnedInAnnotation = 'YES'  # do all of the cephs have it?
 
 
 def build_dicom_without_image(file_path) -> Dataset:
     # Create the DICOM Dataset
     # Create File Meta Information
-    ds=Dataset()
+    ds = Dataset()
     ds.file_meta = build_file_meta()
-    ds.PatientID, image_type, ds.PatientSex, ds.PatientAge = extract_and_convert_data(file_path)
+    ds.PatientID, image_type, ds.PatientSex, ds.PatientAge = extract_and_convert_data(
+        file_path)
     ds.StudyInstanceUID = pydicom.uid.generate_uid()
     ds.SeriesInstanceUID = pydicom.uid.generate_uid()
     ds.SOPInstanceUID = pydicom.uid.generate_uid()
@@ -123,36 +148,37 @@ def build_dicom_without_image(file_path) -> Dataset:
 
     # Date and Time
     now = datetime.datetime.now()
-    ds.StudyDate = now.strftime('%Y%m%d')
-    ds.StudyTime = now.strftime('%H%M%S')
     ds.StudyID = '1'
-    
+
     ds.SeriesNumber = '1'
     ds.InstanceNumber = '1'
     ds.ImageComments = 'Converted from TIFF'
 
     # Additional DICOM attributes to address missing elements
-    # ds.PatientBirthDate = '19000101'  # Placeholder, use actual birth date
-    ds.AccessionNumber = '123456789'  # Use the actual accession number
-    
+    ds.AccessionNumber = ''  # Use the actual accession number
+
     # Conditional elements (only necessary under certain conditions)
     # These should be set based on the actual image and its metadata, and may be omitted if not applicable.
-    ds.ImageLaterality = 'U'  
-    ds.PatientOrientation = 'AF'  
+    ds.ImageLaterality = 'U'
+    ds.PatientOrientation = 'AF'
     return ds
+
 
 def main():
     # Set up argument parsing
-    parser = argparse.ArgumentParser(description="Convert a TIFF file to DICOM, with optional DICOM tags from JSON.")
+    parser = argparse.ArgumentParser(
+        description="Convert a TIFF file to DICOM, with optional DICOM tags from JSON.")
     parser.add_argument('input_tiff', type=str, help="Input TIFF file path")
     parser.add_argument('output_dcm', type=str, help="Output DICOM file path")
-    parser.add_argument('--dicom_json', type=str, help="Path to DICOM tags JSON file (optional)", default=None)
-    
+    parser.add_argument('--dicom_json', type=str,
+                        help="Path to DICOM tags JSON file (optional)", default=None)
+
     # Parse the arguments
     args = parser.parse_args()
-    
+
     # Perform the conversion
     convert_tiff_to_dicom(args.input_tiff, args.output_dcm, args.dicom_json)
+
 
 if __name__ == "__main__":
     main()
