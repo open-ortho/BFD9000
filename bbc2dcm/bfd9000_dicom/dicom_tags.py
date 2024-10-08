@@ -53,11 +53,11 @@ def dpi_to_dicom_spacing(dpi_horizontal, dpi_vertical=None):
 
     # Calculate PixelAspectRatio using original dpi values to avoid rounding errors
     if dpi_horizontal == dpi_vertical:
-        pixel_aspect_ratio = (1,1)
+        pixel_aspect_ratio = [1,1]
     else:
         # Reduce aspect ratio to simplest form
         from math import gcd
         gcd_ratio = gcd(int(dpi_vertical), int(dpi_horizontal))
-        pixel_aspect_ratio = (int(dpi_vertical / gcd_ratio), int(dpi_horizontal / gcd_ratio))
+        pixel_aspect_ratio = [f"{int(dpi_vertical / gcd_ratio)}", f"{int(dpi_horizontal / gcd_ratio)}"]
 
-    return ((spacing_horizontal, spacing_vertical), pixel_aspect_ratio)
+    return ([f"{spacing_horizontal}", f"{spacing_vertical}"], pixel_aspect_ratio)

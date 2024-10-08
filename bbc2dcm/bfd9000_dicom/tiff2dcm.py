@@ -84,9 +84,12 @@ def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
     ds.HighBit = high_bit
     ds.PixelData = img_array.tobytes()
 
-    ds.NominalScannedPixelSpacing, ds.PixelAspectRatio = dpi_to_dicom_spacing(
+    (ds.NominalScannedPixelSpacing, ds.PixelAspectRatio) = dpi_to_dicom_spacing(
         dpi_horizontal, dpi_vertical)
+    ds.PixelSpacing = ds.NominalScannedPixelSpacing
+    ds.PixelSpacingCalibrationType = "GEOMETRY"
     # Save the DICOM file
+    add_common_tags(ds)
     ds.save_as(dicom_path, write_like_original=False)
     print(f"Saved DICOM file at {dicom_path}")
 
