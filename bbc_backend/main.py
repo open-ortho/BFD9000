@@ -5,7 +5,6 @@ import os
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastai.vision.all import load_learner, PILImage
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
@@ -22,6 +21,22 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024
 # function stub needed by models dataloaders
 def label_func(f):
     pass
+
+async def validate_file_size(image: UploadFile, max_size: int):
+    """
+    Validates the uploaded image to ensure it does not exceed the max allowed size.
+
+    Args:
+        image (UploadFile): The uploaded image file.
+        max_size (int): Maximum allowed size in bytes.
+
+    Raises:
+        HTTPException: If the image exceeds the allowed size.
+    """
+    image_size = len(await image.read())
+    if image_size > max_size:
+        raise HTTPException(status_code=400, detail=f"Image size exceeds the maximum allowed size of {max_size / (1024 * 1024)} MB.")
+    await image.seek(0)  # Reset the file pointer after reading
 
 # Configure Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -129,7 +144,7 @@ async def root():
     return {"message": "Welcome to the BFD9000 X-ray Classification API. Visit /docs for API documentation."}
 
 @app.post("/xray-info")
-async def get_xray_info(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
+async def get_xray_info(image: UploadFile = File(...)):
     """
     Endpoint to retrieve detailed information about an X-ray image.
     It first classifies the type of X-ray and then, based on the type,
@@ -144,6 +159,7 @@ async def get_xray_info(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
     }
     """
     logger.info("/xray-info endpoint called.")
+    await validate_file_size(image, MAX_IMAGE_SIZE)
     await validate_image(image)
     
     try:
@@ -171,31 +187,13 @@ async def get_xray_info(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
         }
         
         # Step 2: If X-ray is lateral or frontal, get additional info
-        if xray_class.lower() == "lateral":
-            lateral_model = models.get('lateral')
-            if not lateral_model:
-                logger.error("Lateral model not loaded.")
-                raise HTTPException(status_code=500, detail="Lateral model not loaded.")
-            
-            lateral_pred, lateral_idx, lateral_probs = await run_in_threadpool(lateral_model.predict, pil_img)
-            logger.info(f"Lateral classification: {lateral_pred} with probability {lateral_probs[lateral_idx]:.4f}")
-            
-            lateral_result = map_fliprot_prediction(str(lateral_pred), 'lateral')
-            response_data["rotation"] = lateral_result["rotation"]
-            response_data["flip"] = lateral_result["flip"]
-        
-        elif xray_class.lower() == "frontal":
-            frontal_model = models.get('frontal')
-            if not frontal_model:
-                logger.error("Frontal model not loaded.")
-                raise HTTPException(status_code=500, detail="Frontal model not loaded.")
-            
-            frontal_pred, frontal_idx, frontal_probs = await run_in_threadpool(frontal_model.predict, pil_img)
-            logger.info(f"Frontal classification: {frontal_pred} with probability {frontal_probs[frontal_idx]:.4f}")
-            
-            frontal_result = map_fliprot_prediction(str(frontal_pred), 'frontal')
-            response_data["rotation"] = frontal_result["rotation"]
-            response_data["flip"] = frontal_result["flip"]
+        if xray_class.lower() in ["lateral", "frontal"]:
+            model_key = xray_class.lower()
+            await image.seek(0)  # Reset the file pointer before calling classify_specific_model
+            additional_info = await classify_specific_model(image, model_key)
+            mapped_result = map_fliprot_prediction(additional_info["prediction"], model_key)
+            response_data["rotation"] = mapped_result["rotation"]
+            response_data["flip"] = mapped_result["flip"]
         
         return response_data
     except HTTPException as he:
@@ -205,7 +203,7 @@ async def get_xray_info(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
         raise HTTPException(status_code=500, detail="An error occurred while processing the image.")
 
 @app.post("/xray-class")
-async def classify_xray(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
+async def classify_xray(image: UploadFile = File(...)):
     """
     Endpoint to classify an X-ray image into its type (e.g., lateral, frontal, chest, etc.).
     Uses only the X-ray classification model.
@@ -222,6 +220,7 @@ async def classify_xray(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
     }
     """
     logger.info("/xray-class endpoint called.")
+    await validate_file_size(image, MAX_IMAGE_SIZE)
     await validate_image(image)
     
     try:
@@ -255,7 +254,7 @@ async def classify_xray(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
     
 
 @app.post("/lateral-fliprot")
-async def classify_lateral_fliprot(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
+async def classify_lateral_fliprot(image: UploadFile = File(...)):
     """
     Endpoint to classify the rotation and flipping of a lateral ceph X-ray.
     Uses the Lateral classification model.
@@ -272,11 +271,12 @@ async def classify_lateral_fliprot(image: UploadFile = File(..., max_size=MAX_IM
     }
     """
     logger.info("/lateral-fliprot endpoint called.")
+    await validate_file_size(image, MAX_IMAGE_SIZE)
     await validate_image(image)
     return await classify_specific_model(image, 'lateral')
 
 @app.post("/frontal-fliprot")
-async def classify_frontal_fliprot(image: UploadFile = File(..., max_size=MAX_IMAGE_SIZE)):
+async def classify_frontal_fliprot(image: UploadFile = File(...)):
     """
     Endpoint to classify the rotation of a frontal ceph X-ray.
     Uses the Frontal classification model.
@@ -292,7 +292,8 @@ async def classify_frontal_fliprot(image: UploadFile = File(..., max_size=MAX_IM
         ]
     }
     """
-    logger.info("/frontal-rot endpoint called.")
+    logger.info("/frontal-fliprot endpoint called.")
+    await validate_file_size(image, MAX_IMAGE_SIZE)
     await validate_image(image)
     return await classify_specific_model(image, 'frontal')
 
@@ -405,7 +406,7 @@ async def load_and_preprocess_image(image: UploadFile) -> PILImage:
         logger.debug("Read %d bytes from the uploaded image.", len(image_bytes))
 
         # Load image using imageio
-        img = imageio.imread(io.BytesIO(image_bytes))
+        img = imageio.v3.imread(io.BytesIO(image_bytes))
         logger.debug("Image loaded with shape %s and dtype %s.", img.shape, img.dtype)
 
         # Handle RGBA by ignoring the alpha channel
