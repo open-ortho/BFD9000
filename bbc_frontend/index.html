@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BFD9000</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        #dropArea {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .dragging {
+            border-color: #000;
+        }
+    </style>
+    <script defer src="main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body>
+    <header class="container-fluid">
+        <hgroup>
+            <h2>BFD9000</h2>
+            <p>Bolton Brush Collection Dicomizator 9000</p>
+        </hgroup>
+    </header>
+    <main class="container-fluid">
+        <p>Upload X-rays to classify</p>
+        <div x-data="xrayUploader()">
+            <div id="dropArea" @dragover.prevent="dragOver" @dragleave.prevent="dragLeave" @drop.prevent="drop">
+                <p>Drag and drop X-rays here (png, jpg, tiff)</p>
+            </div>
+            <div>
+                <template x-for="xray in xrays" :key="xray.filename">
+                    <article style="display: flex; align-items: center;">
+                        <img :src="xray.filename" width="128" height="128" style="margin-right: 20px;" />
+                        <div>
+                            <h3 x-text="xray.xrayType"></h3>
+                            <p x-text="'Rotation: ' + xray.rotation"></p>
+                            <p x-text="'Flip: ' + xray.flip"></p>
+                        </div>
+                    </article>
+                </template>
+            </div>
+        </div>
+    </main>
+    <footer>
+    </footer>
+</body>
+
+</html>
