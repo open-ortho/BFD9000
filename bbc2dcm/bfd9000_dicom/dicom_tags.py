@@ -23,6 +23,13 @@ def expected_tags():
     ds = Dataset()
     ds.DateOfSecondaryCapture = ''
     ds.TimeOfSecondaryCapture = ''
+    ds.PatientAge = ''
+    ds.PatientSex = ''
+    ds.PatientId = ''
+    ds.PatientOrientation = ''
+    ds.AnatomicRegionSequence = []
+
+
 
 def dpi_to_dicom_spacing(dpi_horizontal, dpi_vertical=None):
     """
