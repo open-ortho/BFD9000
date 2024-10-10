@@ -9,7 +9,7 @@ from PIL import Image
 import numpy as np
 import logging
 
-from bfd9000_dicom.dicom_tags import dpi_to_dicom_spacing
+from bfd9000_dicom.dicom_tags import dpi_to_dicom_spacing, build_file_meta, add_common_bolton_brush_tags
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -19,13 +19,9 @@ def extract_and_convert_data(file_path):
     file_name = os.path.basename(file_path)
     # Extract data from file name
     patient_id = file_name[0:5]
-    print(f"[{patient_id}]")
     image_type = file_name[5]
-    print(f"[{image_type}]")
     patient_sex = file_name[6]
-    print(f"[{patient_sex}]")
     patient_age = file_name[7:13]  # Assume format is 'AAyBBm'
-    print(f"[{patient_age}]")
 
     # Parse age from format 'AAyBBm' (e.g., '23y02m') to total months 'nnnM'
     years = int(patient_age[:2])
@@ -34,7 +30,10 @@ def extract_and_convert_data(file_path):
 
     # Format total months as zero-padded string 'nnnM'
     formatted_age = f"{total_months:03}M"  # Zero-padded to 3 digits
-    print(f"[{formatted_age}]")
+    logger.debug(f"Patient Age: [{formatted_age}]")
+    logger.debug(f"PatientId: [{patient_id}]")
+    logger.debug(f"Image Type: [{image_type}]")
+    logger.debug(f"PatientSex: [{patient_sex}]")
 
     return patient_id, image_type, patient_sex, formatted_age
 
@@ -88,8 +87,10 @@ def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
         dpi_horizontal, dpi_vertical)
     ds.PixelSpacing = ds.NominalScannedPixelSpacing
     ds.PixelSpacingCalibrationType = "GEOMETRY"
+
+    add_common_bolton_brush_tags(ds)
+
     # Save the DICOM file
-    add_common_tags(ds)
     ds.save_as(dicom_path, write_like_original=False)
     print(f"Saved DICOM file at {dicom_path}")
 
@@ -100,42 +101,6 @@ def load_dataset_from_file(json_file_path) -> Dataset:
     ds = Dataset.from_json(json_data)
     ds.file_meta = build_file_meta()
     return ds
-
-
-def build_file_meta() -> FileMetaDataset:
-    """ File Meta for Secondary Capture SC IOD. """
-    file_meta = FileMetaDataset()
-    file_meta.MediaStorageSOPClassUID = SecondaryCaptureImageStorage
-    file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
-    file_meta.ImplementationClassUID = pydicom.uid.generate_uid()
-    file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
-    return file_meta
-
-
-def add_common_tags(ds) -> Dataset:
-    ds.PatientName = f'{ds.PatientID}^Bolton Study Subject'
-    ds.ReferringPhysicianName = 'Referring^Physician'
-
-    ds.SecondaryCaptureDeviceID = ''
-    ds.SecondaryCaptureDeviceManufacturer = 'Vidar'
-    ds.SecondaryCaptureDeviceManufacturerModelName = 'DosimetryPRO Advantage'
-    ds.SecondaryCaptureDeviceSoftwareVersions = '49.7'
-
-    ds.Modality = 'RG'  # Radiographic imaging (conventional film/screen)
-    ds.ConversionType = 'DF'  # Digitized Film
-
-    # Patient Module
-    ds.PatientBirthDate = ''
-    ds.PatientIdentityRemoved = 'YES'
-    ds.DeidentificationMethod = 'Removed: Patient name, birthdate, study date/time.'
-
-    # General Study Module
-    ds.StudyDate = ""  # These are required or empty if unknown.
-    ds.StudyTime = ""  # These are required or empty if unknown.
-
-    # General Image Module
-    ds.BurnedInAnnotation = 'YES'  # do all of the cephs have it?
-
 
 def build_dicom_without_image(file_path) -> Dataset:
     # Create the DICOM Dataset
@@ -149,8 +114,6 @@ def build_dicom_without_image(file_path) -> Dataset:
     ds.SOPInstanceUID = pydicom.uid.generate_uid()
     ds.SOPClassUID = SecondaryCaptureImageStorage
 
-    # Date and Time
-    now = datetime.datetime.now()
     ds.StudyID = '1'
 
     ds.SeriesNumber = '1'
