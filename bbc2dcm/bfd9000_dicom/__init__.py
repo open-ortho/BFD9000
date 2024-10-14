@@ -1,3 +1,7 @@
+""" PoC package to convert BBGSC TIFFs into JPEG2000 encapsulated DICOMs.
+
+The module is purposely divided into modules with division of concerns, so that it may facilitate re-use and inclusion in the BFD9000 API.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
