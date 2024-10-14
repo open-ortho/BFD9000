@@ -33,7 +33,7 @@ def extract_and_convert_data(file_path):
     return patient_id, image_type, patient_sex, formatted_age
 
 
-def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
+def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None, with_compression=True):
     # Open the TIFF file using Pillow
 
     # Create and populate DICOM dataset with image data and metadata
@@ -42,7 +42,7 @@ def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
     else:
         ds = build_dicom_without_image(tiff_path)
 
-    ds = add_image_module(ds, tiff_path)
+    ds = add_image_module(ds, tiff_path,with_compression)
 
     add_common_bolton_brush_tags(ds)
 
@@ -95,12 +95,13 @@ def main():
     parser.add_argument('output_dcm', type=str, help="Output DICOM file path")
     parser.add_argument('--dicom_json', type=str,
                         help="Path to DICOM tags JSON file (optional)", default=None)
+    parser.add_argument('-c', '--compress', action='store_true', help="Compress Image losslessly with JPEG2000")
 
     # Parse the arguments
     args = parser.parse_args()
 
     # Perform the conversion
-    convert_tiff_to_dicom(args.input_tiff, args.output_dcm, args.dicom_json)
+    convert_tiff_to_dicom(args.input_tiff, args.output_dcm, args.dicom_json, args.compress)
 
 
 if __name__ == "__main__":
