@@ -5,8 +5,11 @@ https://dicomiseasy.blogspot.com/2013/06/getting-oriented-using-image-plane.html
 """
 import pydicom
 from pydicom import Dataset, FileMetaDataset
-from pydicom.uid import ExplicitVRLittleEndian, SecondaryCaptureImageStorage
-
+from pydicom.uid import ExplicitVRLittleEndian, SecondaryCaptureImageStorage, JPEG2000Lossless
+import numpy as np
+from PIL import Image
+from bfd9000_dicom.jpeg2000 import get_encapsulated_jpeg2k_pixel_data
+from bfd9000_dicom import logger, UnsupportedBitDepthError, UnsupportedImageModeError
 
 def dicom_tags_LL(ds: Dataset):
     ds.ImagePositionPatient = ''
@@ -53,7 +56,6 @@ def build_file_meta() -> FileMetaDataset:
     file_meta.MediaStorageSOPClassUID = SecondaryCaptureImageStorage
     file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
     file_meta.ImplementationClassUID = pydicom.uid.generate_uid()
-    file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
     return file_meta
 
 def add_common_bolton_brush_tags(ds) -> Dataset:
@@ -83,6 +85,60 @@ def add_common_bolton_brush_tags(ds) -> Dataset:
     ds.BurnedInAnnotation = 'YES'  # do all of the cephs have it?
 
 
+def add_image_module(ds:Dataset,tiff_path,with_compression=True):
+    """ Adds the DICOM Image Module. """
+    try:
+        with Image.open(tiff_path) as img:
+            img.seek(0)
+            # Extract DPI information
+            dpi_horizontal, dpi_vertical = img.info['dpi']
+            mode = img.mode
+            if mode in ['RGBA','P']:
+                img = img.convert('RGB')
+            elif mode == 'LA':
+                img = img.convert('L')
+            elif mode not in ['L', 'RGB', 'I;16']:
+                raise UnsupportedImageModeError(mode)
+
+            if with_compression:
+                img_array = np.array(img)
+            else:
+                # Load the image into a numpy array and ensure it's in 16-bit
+                # Explicitly setting dtype to uint16
+                img_array = np.array(img, dtype=np.uint16)
+
+            if img_array.dtype == np.uint8:
+                bits_allocated = 8
+            elif img_array.dtype == np.uint16:
+                bits_allocated = 16
+            else:
+                raise UnsupportedBitDepthError(img_array.dtype)
+
+            ds.Rows, ds.Columns = img_array.shape[0], img_array.shape[1]
+            ds.SamplesPerPixel = 1
+            ds.PhotometricInterpretation = "MONOCHROME2"
+            ds.PixelRepresentation = 0
+            ds.BitsStored = bits_allocated
+            ds.BitsAllocated = bits_allocated
+            ds.HighBit = ds.BitsStored - 1
+
+            (ds.NominalScannedPixelSpacing, ds.PixelAspectRatio) = dpi_to_dicom_spacing(
+                dpi_horizontal, dpi_vertical)
+            ds.PixelSpacing = ds.NominalScannedPixelSpacing
+            ds.PixelSpacingCalibrationType = "GEOMETRY"
+
+            if with_compression:
+                ds.file_meta.TransferSyntaxUID = JPEG2000Lossless
+                ds.PixelData = get_encapsulated_jpeg2k_pixel_data(img_array)
+            else:
+                ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+                ds.PixelData = img_array.tobytes()
+            add_common_bolton_brush_tags(ds)
+            return ds
+
+    except Exception as e:
+        logger.error(f"Error processing image {tiff_path}: {e}")
+        return None
 
 
 def dpi_to_dicom_spacing(dpi_horizontal, dpi_vertical=None):

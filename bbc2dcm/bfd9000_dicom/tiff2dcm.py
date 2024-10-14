@@ -2,17 +2,12 @@ import os
 import json
 import pydicom
 import argparse
-import datetime
-from pydicom.dataset import Dataset, FileMetaDataset
-from pydicom.uid import ExplicitVRLittleEndian, SecondaryCaptureImageStorage
+from pydicom.dataset import Dataset
+from pydicom.uid import SecondaryCaptureImageStorage
 from PIL import Image
 import numpy as np
-import logging
-
-from bfd9000_dicom.dicom_tags import dpi_to_dicom_spacing, build_file_meta, add_common_bolton_brush_tags
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from bfd9000_dicom import logger
+from bfd9000_dicom.dicom_tags import build_file_meta, add_common_bolton_brush_tags, add_image_module
 
 
 def extract_and_convert_data(file_path):
@@ -40,53 +35,14 @@ def extract_and_convert_data(file_path):
 
 def convert_tiff_to_dicom(tiff_path, dicom_path, dicom_json=None):
     # Open the TIFF file using Pillow
-    with Image.open(tiff_path) as img:
-        # Convert image to grayscale if it isn't already
-        img = img.convert('I')
-
-        # Extract DPI information
-        dpi_horizontal, dpi_vertical = img.info['dpi']
-
-        # Load the image into a numpy array and ensure it's in 16-bit
-        # Explicitly setting dtype to uint16
-        img_array = np.array(img, dtype=np.uint16)
-
-        # Check the array dimensions and flatten if necessary
-        if len(img_array.shape) > 2:
-            # Take the first channel if multi-dimensional
-            img_array = img_array[:, :, 0]
-
-        # Check maximum pixel value to infer bit depth
-        max_pixel_value = img_array.max()
-        if max_pixel_value > 4095:
-            bits_allocated = 16
-        else:
-            bits_allocated = 12  # Assumes 12-bit data if max value is 4095 or less
-
-        logger.warning(f"max_pixel_value: {max_pixel_value}, allocating {
-                       bits_allocated} bits.")
-
-        bits_stored = bits_allocated
-        high_bit = bits_stored - 1
 
     # Create and populate DICOM dataset with image data and metadata
     if dicom_json:
         ds = load_dataset_from_file(dicom_json)
     else:
         ds = build_dicom_without_image(tiff_path)
-    ds.Rows, ds.Columns = img_array.shape[0], img_array.shape[1]
-    ds.SamplesPerPixel = 1
-    ds.PhotometricInterpretation = "MONOCHROME2"
-    ds.PixelRepresentation = 0
-    ds.BitsStored = bits_stored
-    ds.BitsAllocated = bits_allocated
-    ds.HighBit = high_bit
-    ds.PixelData = img_array.tobytes()
 
-    (ds.NominalScannedPixelSpacing, ds.PixelAspectRatio) = dpi_to_dicom_spacing(
-        dpi_horizontal, dpi_vertical)
-    ds.PixelSpacing = ds.NominalScannedPixelSpacing
-    ds.PixelSpacingCalibrationType = "GEOMETRY"
+    ds = add_image_module(ds, tiff_path)
 
     add_common_bolton_brush_tags(ds)
 
@@ -101,6 +57,7 @@ def load_dataset_from_file(json_file_path) -> Dataset:
     ds = Dataset.from_json(json_data)
     ds.file_meta = build_file_meta()
     return ds
+
 
 def build_dicom_without_image(file_path) -> Dataset:
     # Create the DICOM Dataset
